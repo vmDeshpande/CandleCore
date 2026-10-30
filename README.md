@@ -4,7 +4,7 @@
 **Project type:** Public, extensible Python-first algorithmic trading platform\
 **Initial exchange:** Delta Exchange India\
 **Initial instruments:** BTCUSD, ETHUSD, SOLUSD\
-**Primary timeframe:** 3 minutes\
+**Initial CC-M1 data interval:** 3 minutes only; strategy instances choose their own timeframes\
 **Execution mode:** Paper trading only when execution is introduced
 
 ## What CandleCore is
@@ -98,8 +98,7 @@ Additional strategy ecosystem documents:
 ## Initial development target
 
 CC-M1 is the reliable market-data foundation. It downloads historical
-three-minute candles for the three approved instruments, collects live
-three-minute candle updates, persists raw and normalized data, detects
+three-minute candles for the three initial instruments as the first ingestion slice. This is a CC-M1 scope limit, not a platform-wide or strategy-level primary timeframe. Later data subscriptions are derived from the active strategies' declared symbol/timeframe requirements. It collects live updates, persists raw and normalized data, detects
 gaps, performs bounded recovery and exposes read-only historical data
 through FastAPI.
 
