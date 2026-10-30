@@ -29,6 +29,7 @@ export function Chart({
   const wsRef = useRef<WebSocket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [empty, setEmpty] = useState(false);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -75,45 +76,64 @@ export function Chart({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
     setLoading(true);
     setError(null);
-    fetch(
-      `${API_BASE}/api/v1/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=500`,
-    )
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          setError(data.error);
-          setLoading(false);
-          return;
+    setEmpty(false);
+
+    const loadHistory = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/v1/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=500`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error(`History request failed: HTTP ${response.status}`);
         }
-        const candles = (data.candles || []).map((c: any) => ({
-          time: Math.floor(
-            new Date(c.candle_open_time).getTime() / 1000,
-          ) as UTCTimestamp,
-          open: parseFloat(c.open),
-          high: parseFloat(c.high),
-          low: parseFloat(c.low),
-          close: parseFloat(c.close),
+        const data = await response.json();
+        if (cancelled) return;
+        if (data.error) throw new Error(data.error);
+
+        const rows = Array.isArray(data.candles) ? data.candles : [];
+        const candles = rows.map((c: any) => ({
+          time: Math.floor(new Date(c.candle_open_time).getTime() / 1000) as UTCTimestamp,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
         }));
-        const volumes = (data.candles || []).map((c: any) => ({
-          time: Math.floor(
-            new Date(c.candle_open_time).getTime() / 1000,
-          ) as UTCTimestamp,
-          value: c.volume ? parseFloat(c.volume) : 0,
-          color:
-            parseFloat(c.close) >= parseFloat(c.open)
-              ? "#26a69a80"
-              : "#ef535080",
+        const volumes = rows.map((c: any) => ({
+          time: Math.floor(new Date(c.candle_open_time).getTime() / 1000) as UTCTimestamp,
+          value: c.volume == null ? 0 : Number(c.volume),
+          color: Number(c.close) >= Number(c.open) ? "#26a69a80" : "#ef535080",
         }));
+
         candleSeriesRef.current?.setData(candles);
         volumeSeriesRef.current?.setData(volumes);
+        setEmpty(candles.length === 0);
+        setError(null);
         setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message);
+
+        // The API can be queried before the startup backfill has committed.
+        // Retry empty history until the first persisted candles are available.
+        if (candles.length === 0 && !cancelled) {
+          retryTimer = setTimeout(loadHistory, 3000);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Unable to load candle history");
         setLoading(false);
-      });
+        retryTimer = setTimeout(loadHistory, 5000);
+      }
+    };
+
+    void loadHistory();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [symbol, timeframe]);
 
   useEffect(() => {
@@ -165,7 +185,10 @@ export function Chart({
       {loading && (
         <div className="text-center text-gray-400 py-4">Loading...</div>
       )}
-      {error && <div className="text-center text-red-400 py-4">{error}</div>}
+      {error && <div className="text-center text-red-400 py-4">{error} · Retrying…</div>}
+      {empty && !loading && !error && (
+        <div className="text-center text-gray-400 py-4">Waiting for historical candles to be stored…</div>
+      )}
     </div>
   );
 }
