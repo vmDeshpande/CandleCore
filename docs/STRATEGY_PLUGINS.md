@@ -36,6 +36,7 @@ The following is conceptual and will be refined in a versioned SDK RFC:
 ```python
 from typing import Mapping, Protocol, Sequence
 
+
 class StrategyPlugin(Protocol):
     manifest: StrategyManifest
 

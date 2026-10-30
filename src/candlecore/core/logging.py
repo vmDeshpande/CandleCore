@@ -1,4 +1,4 @@
-﻿import structlog
+import structlog
 
 
 def configure_logging() -> None:
