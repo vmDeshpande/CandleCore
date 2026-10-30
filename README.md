@@ -1,11 +1,31 @@
-# CandleCore --- Project Initialization Pack
+# CandleCore — Open, Pluggable Algorithmic Trading Platform
 
 **Status:** Architecture approved; implementation not started\
-**Project type:** Standalone Python-first algorithmic trading platform\
+**Project type:** Public, extensible Python-first algorithmic trading platform\
 **Initial exchange:** Delta Exchange India\
 **Initial instruments:** BTCUSD, ETHUSD, SOLUSD\
 **Primary timeframe:** 3 minutes\
 **Execution mode:** Paper trading only when execution is introduced
+
+## What CandleCore is
+
+CandleCore is an open, extensible host platform for deterministic market analysis and algorithmic trading research. The platform provides market data, charting, perception algorithms, historical replay, backtesting, centralized risk controls and execution adapters.
+
+**Strategies are plugins.** Users and contributors can build, package, configure, test and run independent strategies without modifying CandleCore's core engine. Scalping, intraday, trend-following, mean-reversion and community strategies use the same versioned Strategy Plugin API.
+
+A strategy plugin proposes structured decisions. CandleCore owns risk validation and execution. Plugins cannot access exchange credentials or submit orders directly.
+
+### Core platform vs. strategy plugins
+
+| CandleCore core | Independent strategy plugins |
+|---|---|
+| Exchange data and normalized candles | Entry/exit/no-trade rules |
+| Market perception and features | Strategy-specific state |
+| Charting and annotations | Strategy parameters and configuration |
+| Replay and backtesting runtime | Decision explanations and reason codes |
+| Risk manager and paper/execution adapters | Structured decision proposals |
+
+CandleCore is not an English-to-code system today. Initial authoring will use a deterministic structured builder and a versioned declarative strategy definition. Natural-language conversion is a separate future research item and is not part of the current core.
 
 ## Documents
 
@@ -29,12 +49,18 @@
                                       first milestone
   -----------------------------------------------------------------------
 
+Additional strategy ecosystem documents:
+- `docs/STRATEGY_PLUGINS.md` — plugin contract, lifecycle, compatibility, security and conformance.
+- `docs/STRATEGY_AUTHORING.md` — structured strategy builder and future natural-language authoring boundary.
+- `CONTRIBUTING.md` — contribution expectations.
+
 ## Project rules
 
 1.  CandleCore is independent. Do not reuse, fork, import or depend on
     any other repository.
-2.  Python is the authoritative implementation language for market data,
-    perception, strategy, risk, backtesting and execution.
+2.  Python is authoritative for market data, perception, strategy runtime,
+    risk, backtesting and execution. The public strategy SDK is a stable,
+    versioned extension boundary.
 3.  No LLMs, generative AI, vision-language models, token-based
     inference APIs or GPU inference dependencies.
 4.  No automated live order execution. Paper mode only until separately
@@ -50,6 +76,13 @@
     incomplete trade record.
 10. Do not move to the next milestone until the current milestone's
     acceptance criteria are demonstrated.
+11. Strategies are independently versioned plugins; the core must not
+    hardcode one user's strategy as the only supported strategy.
+12. Plugins propose decisions only. Centralized CandleCore risk controls
+    and execution adapters remain authoritative.
+13. Do not automatically download and execute untrusted community code.
+14. No AI-generated strategy code or natural-language conversion is in
+    the current scope.
 
 ## Source hierarchy
 
@@ -70,5 +103,4 @@ three-minute candle updates, persists raw and normalized data, detects
 gaps, performs bounded recovery and exposes read-only historical data
 through FastAPI.
 
-CC-M1 must not place orders, generate trading signals or implement
-strategy rules.
+CC-M1 must not place orders, generate trading signals, implement strategy rules or implement the plugin runtime. It must preserve the clean architectural boundary needed for the later Strategy Plugin API.
