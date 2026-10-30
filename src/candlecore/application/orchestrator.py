@@ -72,12 +72,14 @@ class CandleCoreApplication:
         return app
 
     async def _handle_ws_message(self, message: dict[str, Any]) -> None:
+        import structlog
+
+        logger = structlog.get_logger()
         try:
             symbol = message.get("symbol") or message.get("product_symbol")
             if isinstance(symbol, str):
                 symbol = symbol.upper()
             else:
-                # try payload
                 payload = message.get("payload")
                 if isinstance(payload, dict):
                     symbol = payload.get("symbol") or payload.get("product_symbol")
@@ -87,20 +89,10 @@ class CandleCoreApplication:
                 return
             timeframe = "3m"
             async for session in get_db_session():
-                services = self.build_services(session)
-                ingestion: IngestionService = services["ingestion"]
-                result = await ingestion.ingest_ws_message(
-                    exchange="delta",
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    source="exchange_ws",
-                    message=message,
-                    timestamp_unit="seconds",
-                )
-                await session.commit()
-                # Broadcast to frontend clients
                 try:
-                    update = normalize_ws_message(
+                    services = self.build_services(session)
+                    ingestion: IngestionService = services["ingestion"]
+                    result = await ingestion.ingest_ws_message(
                         exchange="delta",
                         symbol=symbol,
                         timeframe=timeframe,
@@ -108,47 +100,56 @@ class CandleCoreApplication:
                         message=message,
                         timestamp_unit="seconds",
                     )
-                    await stream.manager.broadcast(
-                        {
-                            "type": "candle",
-                            "exchange": "delta",
-                            "symbol": symbol,
-                            "timeframe": timeframe,
-                            "candle_open_time": update.candle_open_time.isoformat(),
-                            "open": str(update.open),
-                            "high": str(update.high),
-                            "low": str(update.low),
-                            "close": str(update.close),
-                            "volume": str(update.volume) if update.volume is not None else None,
-                            "state": result.state.value
-                            if hasattr(result.state, "value")
-                            else str(result.state),
-                            "revision": result.revision,
-                        }
-                    )
-                except Exception:
-                    pass
+                    await session.commit()
+                    try:
+                        update = normalize_ws_message(
+                            exchange="delta",
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            source="exchange_ws",
+                            message=message,
+                            timestamp_unit="seconds",
+                        )
+                        await stream.manager.broadcast(
+                            {
+                                "type": "candle",
+                                "exchange": "delta",
+                                "symbol": symbol,
+                                "timeframe": timeframe,
+                                "candle_open_time": update.candle_open_time.isoformat(),
+                                "open": str(update.open),
+                                "high": str(update.high),
+                                "low": str(update.low),
+                                "close": str(update.close),
+                                "volume": str(update.volume) if update.volume is not None else None,
+                                "state": result.state.value
+                                if hasattr(result.state, "value")
+                                else str(result.state),
+                                "revision": result.revision,
+                            }
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "ws_broadcast_failed", symbol=symbol, error=str(exc), exc_info=True
+                        )
+                except Exception as exc:
+                    await session.rollback()
+                    logger.error("ws_ingest_failed", symbol=symbol, error=str(exc), exc_info=True)
                 break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("ws_message_handler_failed", error=str(exc), exc_info=True)
 
     async def _backfill_historical(self) -> None:
+        import structlog
+
+        logger = structlog.get_logger()
         try:
             async for session in get_db_session():
                 services = self.build_services(session)
                 ingestion: IngestionService = services["ingestion"]
                 for symbol in self.settings.symbol_list:
-                    try:
-                        candles = await self.rest_client.get_candles_chunked(
-                            symbol=symbol,
-                            resolution="3m",
-                            start=0,
-                            end=2000000000,
-                        )
-                        # get_candles_chunked requires start < end; better to fetch recent window
-                    except Exception:
-                        candles = []
-                    # fetch recent window properly
+                    logger.info("backfill_started", symbol=symbol)
+                    candles = []
                     try:
                         from datetime import datetime
 
@@ -160,36 +161,57 @@ class CandleCoreApplication:
                             start=start_ts,
                             end=end_ts,
                         )
-                    except Exception:
-                        candles = []
-                    for c in candles:
-                        try:
-                            await ingestion.ingest_rest_candle(
-                                exchange="delta",
-                                symbol=symbol,
-                                timeframe="3m",
-                                source="exchange_rest",
-                                candle=c,
-                                timestamp_unit="seconds",
-                            )
-                        except Exception:
-                            continue
-                    await session.commit()
+                    except Exception as exc:
+                        logger.error(
+                            "backfill_failed", symbol=symbol, error=str(exc), exc_info=True
+                        )
+                        continue
+                    inserted = 0
+                    try:
+                        for c in candles:
+                            try:
+                                await ingestion.ingest_rest_candle(
+                                    exchange="delta",
+                                    symbol=symbol,
+                                    timeframe="3m",
+                                    source="exchange_rest",
+                                    candle=c,
+                                    timestamp_unit="seconds",
+                                )
+                                inserted += 1
+                            except Exception as exc:
+                                logger.error(
+                                    "backfill_persist_failed",
+                                    symbol=symbol,
+                                    error=str(exc),
+                                    exc_info=True,
+                                )
+                                continue
+                        await session.commit()
+                        logger.info(
+                            "backfill_completed",
+                            symbol=symbol,
+                            returned_count=len(candles),
+                            inserted_count=inserted,
+                        )
+                    except Exception as exc:
+                        await session.rollback()
+                        logger.error(
+                            "backfill_commit_failed", symbol=symbol, error=str(exc), exc_info=True
+                        )
+                        continue
                 break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("backfill_loop_failed", error=str(exc), exc_info=True)
 
     async def startup(self) -> None:
         if self._started:
             return
         await init_db()
         self._started = True
-        # Attach message handler
         self.ws_client.on_message = self._handle_ws_message  # type: ignore[assignment]
-        # Start collector
         if self._collector_task is None or self._collector_task.done():
             self._collector_task = asyncio.create_task(self.ws_client.start())
-        # Start backfill
         if self._backfill_task is None or self._backfill_task.done():
             self._backfill_task = asyncio.create_task(self._backfill_historical())
 
