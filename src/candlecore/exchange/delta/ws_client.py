@@ -118,7 +118,7 @@ class DeltaWebSocketClient:
             return
 
         message_type = data.get("type")
-        if message_type in {"pong", "subscribed", "subscription", "ack", "heartbeat"}:
+        if message_type in {"pong", "subscribed", "subscription", "subscriptions", "ack", "heartbeat"}:
             if message_type == "heartbeat":
                 logger.debug("heartbeat_received")
             return
