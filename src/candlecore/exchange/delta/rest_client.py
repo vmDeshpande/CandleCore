@@ -166,10 +166,12 @@ class DeltaRestClient:
         end: int,
         max_candles: int = MAX_CANDLES_PER_REQUEST,
     ) -> list[dict[str, Any]]:
-        """Fetch candles across [start, end) in bounded chunks.
+        """Fetch [start, end) in bounded time windows.
 
-        Returns candles deduplicated by candle time and sorted ascending.
-        Never assumes a short response means the full interval is complete.
+        Each request covers at most max_candles intervals. Advance by the
+        requested window boundary, never by response ordering: Delta may return
+        candles newest-first or oldest-first. Results are deduplicated and
+        returned in ascending chronological order.
         """
         if not symbol:
             raise ValueError("symbol is required")
@@ -181,45 +183,41 @@ class DeltaRestClient:
 
         all_candles: list[dict[str, Any]] = []
         current_start = start
+        request_count = 0
 
         while current_start < end:
             current_end = min(current_start + max_candles * interval_seconds, end)
-            try:
-                response = await self.get_candles(symbol, resolution, current_start, current_end)
-            except Exception:
-                logger.error(
-                    "chunk_fetch_failed",
-                    symbol=symbol,
-                    resolution=resolution,
-                    start=current_start,
-                    end=current_end,
-                )
-                raise
+            if current_end <= current_start:
+                raise RuntimeError("candle pagination made no forward progress")
 
+            response = await self.get_candles(
+                symbol, resolution, current_start, current_end
+            )
             candles = [c.model_dump() for c in response.result] if response.result else []
-            if not candles:
-                current_start = current_end
-                continue
-
             all_candles.extend(candles)
-            last_time = candles[-1].get("time")
-            if last_time is None:
-                current_start = current_end
-                continue
+            request_count += 1
 
-            last_time = int(last_time)
-            if len(candles) < max_candles:
-                current_start = current_end
-            else:
-                current_start = last_time + interval_seconds
+            logger.info(
+                "candle_chunk_fetched",
+                symbol=symbol,
+                resolution=resolution,
+                request_count=request_count,
+                request_start=current_start,
+                request_end=current_end,
+                returned_count=len(candles),
+            )
 
-        seen: set[int] = set()
-        unique_candles: list[dict[str, Any]] = []
+            # Advance by the bounded request window, not candles[-1]. The
+            # response may be descending, sparse, or empty; none should cause
+            # a one-candle cursor advance or an unbounded loop.
+            previous_start = current_start
+            current_start = current_end
+            if current_start <= previous_start:
+                raise RuntimeError("candle pagination cursor did not advance")
+
+        by_time: dict[int, dict[str, Any]] = {}
         for candle in all_candles:
-            candle_time = candle.get("time")
-            if candle_time is None or candle_time in seen:
-                continue
-            seen.add(candle_time)
-            unique_candles.append(candle)
-        unique_candles.sort(key=lambda c: c["time"])
-        return unique_candles
+            candle_time = int(candle["time"])
+            by_time[candle_time] = candle
+
+        return [by_time[t] for t in sorted(by_time)]
