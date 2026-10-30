@@ -28,10 +28,9 @@ dependencies. Conventional ML is optional and deferred.
 Initial exchange: Delta Exchange India. Initial instruments: BTCUSD,
 ETHUSD and SOLUSD.
 
-### ADR-005 --- Primary timeframe
+### ADR-005 --- Initial market-data interval (not a global primary timeframe)
 
-The initial primary timeframe is 3m. Additional timeframes are supported
-by architecture but are not automatically included in CC-M1.
+3m is the initial CC-M1 collection interval for BTCUSD, ETHUSD and SOLUSD only. CandleCore has no platform-wide primary timeframe. Each enabled strategy instance declares its own required timeframes, and the platform plans subscriptions and history acquisition from those requirements. Multi-timeframe strategies are supported. CC-M1 remains deliberately limited to 3m until later milestones expand the data planner.
 
 ### ADR-006 --- Trading profiles
 
@@ -123,7 +122,7 @@ prioritize order placement ahead of data and strategy validation.
     fees and direction.
 -   Screenshot metadata availability and whether chart time/price axes
     are visible.
--   Which timeframes beyond 3m the friend actually uses.
+-   Which timeframes the friend's strategy uses; this must be captured from evidence rather than assumed. The platform itself must remain timeframe-configurable per strategy.
 -   Exact entry, stop, target, invalidation and no-trade rules.
 -   Whether friend uses mark price, traded price or another reference
     for specific decisions.
