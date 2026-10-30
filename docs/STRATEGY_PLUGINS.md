@@ -78,7 +78,7 @@ Each package declares a manifest containing:
 | `description` | What the strategy does |
 | `tags` | Scalping, intraday, trend, mean-reversion, etc. |
 | `symbols` | Supported instruments |
-| `timeframes` | Required intervals |
+| `timeframes` | Required intervals, including entry/exit and higher-timeframe context |
 | `required_features` | Perception features/events consumed |
 | `config_schema` | Typed configuration contract |
 | `entry_point` | Plugin factory/class |
@@ -109,14 +109,24 @@ The host adds risk-validation outcome and any paper/execution identifiers. The p
 A plugin package can be installed once and configured as multiple independent instances. Each instance has its own:
 - Config and config hash.
 - State.
-- Symbol/timeframe subscriptions.
+- Symbol/timeframe subscriptions, derived from this instance's manifest and configuration.
+- Entry, exit, filter and higher-timeframe roles for each interval.
+- Candle finality requirements and warm-up/lookback history.
 - Enabled/disabled state.
 - Risk allocation selected by the platform operator.
 - Decisions, backtests and performance history.
 
 Do not let a strategy infer that it owns the whole account balance. Portfolio exposure is centralized.
 
-## 7. Determinism and replay
+## 7. Strategy-driven timeframe selection
+
+There is no platform-wide primary timeframe. Each strategy instance declares the exact intervals it consumes. A multi-timeframe strategy may request, for example, 1m entries, 5m confirmation and 1h trend context; another strategy may use a single 4h interval. These are illustrative examples, not hardcoded platform choices.
+
+The host computes the union of enabled instances' data requirements, deduplicates common feeds, requests required historical warm-up and maintains freshness/gap status per symbol/timeframe/source. If an exchange does not provide a requested interval, the host must either use a separately validated aggregation path or report the interval as unsupported. It must never silently substitute a different interval.
+
+Higher-timeframe data must be finalized and knowable at the decision time. Derived candles must preserve provenance and cannot hide missing source intervals. The platform should allow users to configure strategy-specific symbols and timeframes without changing core code.
+
+## 8. Determinism and replay
 
 Given identical:
 - Plugin package hash.
@@ -131,7 +141,7 @@ the plugin should produce identical decisions.
 
 A plugin may not inspect future candles, use wall-clock time as a hidden signal, fetch unrecorded network data or read mutable external state. If a strategy needs external data in a later release, that data must be declared, timestamped, recorded and replayable.
 
-## 8. Plugin lifecycle
+## 9. Plugin lifecycle
 
 `DISCOVERED -> VALIDATED -> INSTALLED -> CONFIGURED -> ENABLED -> RUNNING`
 
@@ -143,7 +153,7 @@ Possible terminal/safety states:
 
 State transitions are audited. A plugin that repeatedly fails, violates time limits or emits invalid decisions can be disabled without affecting the market-data collector or other plugins.
 
-## 9. Security model
+## 10. Security model
 
 Python plugins execute code. Loading a third-party package inside the main process is not a security boundary.
 
@@ -165,7 +175,7 @@ Before a public plugin marketplace or untrusted community code is supported:
 - Define permission scopes and revocation.
 - Test crash containment and state recovery.
 
-## 10. Conformance suite
+## 11. Conformance suite
 
 A plugin must pass:
 1. Manifest and schema validation.
@@ -182,7 +192,7 @@ A plugin must pass:
 
 Passing conformance establishes technical compatibility, not profitability or safety of a trading idea.
 
-## 11. Packaging and distribution
+## 12. Packaging and distribution
 
 The initial SDK should support ordinary Python packages with a documented entry-point convention and pinned dependencies. The exact Python entry-point group, package naming convention and SDK release policy will be specified in the SDK RFC.
 
@@ -196,7 +206,7 @@ Do not build a public marketplace in the first implementation. Start with:
 
 A remote registry can be considered after isolation and supply-chain controls exist.
 
-## 12. Strategy authoring paths
+## 13. Strategy authoring paths
 
 There are two distinct ways to create a strategy:
 
@@ -210,7 +220,7 @@ A developer implements custom strategy logic against the public SDK. This suppor
 
 Natural-language strategy conversion is not part of the initial plugin release. See `STRATEGY_AUTHORING.md` for the future design boundary.
 
-## 13. Versioning policy
+## 14. Versioning policy
 
 - Public plugin API follows semantic versioning.
 - Plugin declares the compatible API range.
@@ -219,6 +229,6 @@ Natural-language strategy conversion is not part of the initial plugin release. 
 - Backtest results pin the plugin package hash, API version, config hash and data revision.
 - Deprecated API versions have a documented support window.
 
-## 14. Performance and risk disclosure
+## 15. Performance and risk disclosure
 
 Plugin authors must not claim a strategy is profitable based only on win rate or an in-sample backtest. Public examples and any future registry listing should disclose costs, slippage, funding, sample period, instruments, timeframe, drawdown, out-of-sample methodology and assumptions. CandleCore technical compatibility is not an endorsement or investment recommendation.
