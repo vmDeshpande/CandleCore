@@ -6,10 +6,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-TEST_DB_URL = os.environ.get(
-    "CANDLECORE_TEST_DATABASE_URL",
-    "postgresql+asyncpg://candlecore:Vedant2006@127.0.0.1:5432/candlecore_test",
-)
+TEST_DB_URL = os.environ.get("CANDLECORE_TEST_DATABASE_URL")
 
 
 @pytest.fixture(scope="session")
@@ -21,12 +18,16 @@ def event_loop():
 
 @pytest.fixture
 async def pg_engine():
+    if not TEST_DB_URL:
+        pytest.fail(
+            "CANDLECORE_TEST_DATABASE_URL is not set; cannot run PostgreSQL integration tests"
+        )
     try:
         engine = create_async_engine(TEST_DB_URL, echo=False)
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-    except Exception:
-        pytest.skip(f"PostgreSQL not available at {TEST_DB_URL}")
+    except Exception as exc:
+        pytest.fail(f"PostgreSQL integration test connection failed: {exc.__class__.__name__}")
     yield engine
     await engine.dispose()
 
