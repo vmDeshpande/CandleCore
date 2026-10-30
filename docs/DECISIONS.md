@@ -138,3 +138,34 @@ prioritize order placement ahead of data and strategy validation.
 Any change to an approved decision must be recorded here with: -
 Decision ID. - Previous decision. - New decision. - Reason. - Impacted
 modules and documents. - Migration or compatibility requirements.
+
+
+## ADR-016 — Public, pluggable strategy platform
+
+**Status:** Approved  
+**Decision:** CandleCore is a public host platform with a first-class, versioned Strategy Plugin API. Strategy logic is delivered as independently versioned packages/plugins rather than hardcoded into the platform. Multiple strategy instances may run concurrently with isolated configuration and state. Plugins consume standardized market/perception data and emit structured decision proposals. CandleCore retains centralized risk management and execution authority. The same plugin contract must be used in live evaluation, replay and backtesting.
+
+**Consequences:**
+- A plugin SDK, manifest, lifecycle manager, compatibility checks and conformance suite are required.
+- Scalping and intraday are initial strategy profiles, not hardcoded limits on plugin types.
+- Third-party strategies should be separately packaged and must not require edits to core modules.
+- Backtest results pin plugin version/hash, API version, configuration hash and data revision.
+- Python in-process plugins are trusted code, not a sandbox.
+- A marketplace or automatic install-and-run workflow is deferred until isolation and supply-chain security are implemented.
+
+## ADR-017 — Strategy authoring and natural-language conversion
+
+**Status:** Approved direction; detailed DSL schema deferred.  
+**Decision:** The first authoring path is a deterministic structured builder that emits a typed, versioned declarative strategy definition/AST. The host validates and interprets this definition. Developers may implement advanced logic as Python plugins using the public SDK.
+
+Natural-language-to-strategy conversion is explicitly out of current scope. No LLM or generative AI is introduced into the core. It may be evaluated later as a separate optional authoring adapter that can only propose a draft AST for human review and deterministic validation. It must never emit executable arbitrary Python, enable a strategy, change risk controls or place orders.
+
+## ADR-018 — Third-party plugin trust boundary
+
+**Status:** Approved  
+**Decision:** Initial plugin support is limited to explicitly trusted, locally installed packages. In-process Python plugin execution is not considered secure isolation. A public marketplace or untrusted plugin execution requires a separate process/container isolation design, resource limits, package provenance and integrity checks, dependency/license review, permission scopes and revocation controls.
+
+## ADR-019 — Public licensing policy remains unresolved
+
+**Status:** Open  
+**Decision:** Do not infer a license from repository visibility. Before formal plugin registry publication, maintainers must select the CandleCore repository license and define compatible plugin license metadata/policy. Plugin manifests should declare an SPDX license identifier.
