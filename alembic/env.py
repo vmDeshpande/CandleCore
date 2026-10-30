@@ -1,8 +1,10 @@
-﻿from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -17,7 +19,10 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 settings = get_settings()
-config.set_main_option('sqlalchemy.url', settings.database_url.replace('+asyncpg', ''))
+# Alembic runs synchronous migrations. Strip the asyncpg driver so the URL
+# resolves to the default psycopg2 driver used by Alembic's engine_from_config.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg", ""))
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")

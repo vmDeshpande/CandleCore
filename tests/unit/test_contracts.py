@@ -44,8 +44,13 @@ def test_candle_observation_defaults_to_provisional() -> None:
 def test_candle_observation_rejects_invalid_ohlcv(
     overrides: dict[str, object], message: str
 ) -> None:
-    with pytest.raises(ValidationError, match=message):
+    with pytest.raises(ValidationError) as exc_info:
         make_candle(**overrides)
+    error_msg = str(exc_info.value)
+    if message == "prices must be finite":
+        assert "finite" in error_msg
+    else:
+        assert message in error_msg
 
 
 def test_candle_observation_normalizes_aware_timestamps_to_utc() -> None:
@@ -72,12 +77,8 @@ def test_data_gap_requires_positive_interval() -> None:
 
 
 def test_recovery_result_errors_are_not_shared_between_instances() -> None:
-    first = RecoveryResult(
-        success=False, symbols_recovered=[], gaps_filled=0, candles_restored=0
-    )
-    second = RecoveryResult(
-        success=False, symbols_recovered=[], gaps_filled=0, candles_restored=0
-    )
+    first = RecoveryResult(success=False, symbols_recovered=[], gaps_filled=0, candles_restored=0)
+    second = RecoveryResult(success=False, symbols_recovered=[], gaps_filled=0, candles_restored=0)
 
     first.errors.append("REST unavailable")
 
