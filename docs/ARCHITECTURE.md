@@ -26,7 +26,7 @@ conventional and deferred until sufficient labeled observations exist.
 
   Instruments                         BTCUSD, ETHUSD, SOLUSD
 
-  Initial data interval               3m for CC-M1 only
+  Primary timeframe                   3m
 
   Trading styles                      Scalping and intraday, represented
                                       as separate strategy profiles
@@ -52,7 +52,9 @@ conventional and deferred until sufficient labeled observations exist.
   Execution                           Paper-only when introduced
   -----------------------------------------------------------------------
 
-**There is no platform-wide primary timeframe.** Each strategy instance declares the symbols, timeframes, candle finality requirements and features it needs. The platform derives market-data subscriptions from the union of requirements across enabled strategies, subject to exchange capabilities and operator-approved resource limits. CC-M1 initially collects 3m candles for BTCUSD, ETHUSD and SOLUSD as a narrow first ingestion milestone only. This does not constrain later strategies to 3m.
+Other timeframes may be configured later. The initial data milestone is
+limited to the approved three-minute interval unless a later decision
+explicitly expands scope.
 
 ## 3. Architectural principles
 
@@ -250,7 +252,7 @@ without a measured need and an architecture decision record.
 
 ## 8. Public extensibility and plugin safety
 
-CandleCore is designed as a public host platform. The Strategy Plugin API is a first-class architectural boundary, not a late add-on. Plugin packages declare identity, semantic version, compatible API range, configuration schema, supported symbols/timeframes, required perception features, entry point and license. There is no global primary timeframe: each strategy instance declares its own timeframe requirements, including optional multi-timeframe dependencies. The host computes shared data subscriptions from all enabled instances and avoids duplicate collection where requirements overlap.
+CandleCore is designed as a public host platform. The Strategy Plugin API is a first-class architectural boundary, not a late add-on. Plugin packages declare identity, semantic version, compatible API range, configuration schema, supported symbols/timeframes, required perception features, entry point and license.
 
 A plugin returns a structured decision proposal. The host independently validates it and routes it through centralized risk controls. Multiple strategies may run concurrently, each with isolated configuration, state, subscriptions and audit history. Portfolio-level risk is shared and authoritative.
 
@@ -447,20 +449,3 @@ CandleCore's core remains independently maintained and the plugin API is version
 A plugin's performance claims must disclose data period, instrument, timeframe, costs, assumptions, out-of-sample methodology and known limitations. CandleCore must not endorse profitability solely because a plugin passes technical conformance.
 
 The repository's software license and the plugin license compatibility policy must be selected explicitly before publishing a formal plugin registry. Public visibility alone does not grant permission to reuse code.
-
-
-## Strategy-driven timeframe orchestration
-
-There is no global default or primary timeframe for strategy evaluation. A strategy manifest and each configured instance declare:
-- Required symbols/instruments.
-- Required candle intervals/timeframes.
-- Which intervals are used for entries, exits, filters and higher-timeframe context.
-- Whether it needs finalized candles only or also provisional updates.
-- Required warm-up history and lookback windows.
-- Required perception events/features and their source timeframes.
-
-The platform's data-requirements planner computes the union of requirements across all enabled strategy instances, deduplicates overlapping feeds and schedules acquisition/recovery for the required data. It must expose unavailable intervals, unsupported exchange resolutions, stale feeds and resource limits rather than silently substituting another timeframe.
-
-A strategy may consume multiple timeframes simultaneously. Higher-timeframe values must be point-in-time correct: only bars finalized and knowable by the strategy decision timestamp may be used. Lower-timeframe data may be aggregated into a higher timeframe only when source coverage, alignment and correction semantics are defined and the derived series is explicitly identified. Do not assume arbitrary higher-timeframe candles can be reconstructed from incomplete lower-timeframe data.
-
-CC-M1 remains intentionally scoped to 3m collection for BTCUSD, ETHUSD and SOLUSD. That is a milestone constraint, not a permanent product constraint or global primary timeframe.

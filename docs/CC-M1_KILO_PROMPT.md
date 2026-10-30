@@ -36,7 +36,7 @@ CandleCore is a completely new, standalone, public and extensible Python-first p
 
 -   Exchange: Delta Exchange India.
 -   Symbols: BTCUSD, ETHUSD, SOLUSD.
--   Initial collection interval: 3m only for CC-M1. This is a milestone scope limit, not a global CandleCore primary timeframe. Keep timeframe fields generic and configurable.
+-   Timeframe: 3m only for CC-M1.
 -   REST historical endpoint:
     `GET https://api.india.delta.exchange/v2/history/candles`.
 -   REST parameters: `resolution`, `symbol`, `start`, `end`.

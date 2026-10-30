@@ -15,7 +15,7 @@ invent the friend's trading rules or unverified Delta message fields.
 
 -   Exchange: Delta Exchange India.
 -   Symbols: BTCUSD, ETHUSD, SOLUSD.
--   Initial CC-M1 data interval: 3m only. There is no platform-wide primary timeframe; enabled strategy instances declare their own required intervals.
+-   Primary interval: 3m.
 -   Trading styles: scalping and intraday, separated into independently
     configurable profiles.
 -   Backend: Python + FastAPI.
@@ -125,23 +125,6 @@ is a later execution prerequisite; market-data collection still records
 the approved symbols.
 
 ## 4. Market-data architecture
-
-### 4.0 Strategy-driven timeframe requirements
-
-CandleCore has no single global primary timeframe. A strategy plugin manifest and configured instance declare its required symbols, candle intervals, entry/exit intervals, higher-timeframe context, candle finality needs, warm-up history and required perception features. The host derives the union of requirements across all enabled strategy instances and deduplicates subscriptions and historical backfill work.
-
-The market-data planner must:
-- Validate requested intervals against exchange-supported resolutions and configured aggregation capabilities.
-- Make unsupported intervals explicit; never silently replace a requested interval with 3m or another default.
-- Track freshness, gaps and readiness independently per symbol/timeframe/source.
-- Recover and persist data for every enabled strategy's declared requirements.
-- Avoid duplicate upstream subscriptions when multiple plugins share the same feed.
-- Apply explicit resource limits and report when the requested set exceeds them.
-- Support strategy-specific multi-timeframe inputs.
-
-A strategy's higher-timeframe context must use only candles finalized and knowable at its decision timestamp. Lower-timeframe aggregation is allowed only with verified interval alignment, complete source coverage and explicit derived-series provenance. Never fabricate missing bars or imply that an aggregated series is identical to an exchange-native candle feed.
-
-CC-M1 intentionally starts with the 3m interval for BTCUSD, ETHUSD and SOLUSD. This is only the first milestone's collection scope and must not be encoded as a global strategy default or permanent platform restriction.
 
 ### 4.1 Data sources
 
