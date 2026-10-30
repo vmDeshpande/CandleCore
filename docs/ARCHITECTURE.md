@@ -9,8 +9,8 @@ deployed web frontend
 
 CandleCore is a standalone, mathematically driven market-analysis and
 trade-management platform. It will process Delta Exchange market data,
-identify market structures using deterministic algorithms, capture and
-evaluate a discretionary trading methodology, backtest strategies and
+identify market structures using deterministic algorithms, host independently developed, versioned strategy plugins, capture and
+evaluate discretionary trading methodologies, and backtest strategies and
 eventually support controlled paper execution.
 
 CandleCore does not use LLMs, generative AI, vision-language models or
@@ -145,14 +145,24 @@ emit typed events, features and annotations. Initial algorithm sequence:
 10. Multi-timeframe context.
 11. Event lifecycle and invalidation.
 
-### 5.5 Strategy Engine
+### 5.5 Strategy Plugin Host
 
--   Evaluates explicit, versioned strategy rules.
--   Separates scalping and intraday profiles.
--   Produces candidate decisions and explanations.
--   Records BUY, SELL and NO TRADE.
--   Does not submit orders or bypass risk controls.
--   Does not assume the friend's rules before evidence is captured.
+-   Loads compatible, explicitly trusted strategy plugins through a versioned public SDK.
+-   Supports multiple independently configured strategy instances.
+-   Supplies standardized market snapshots, confirmed perception events and feature contracts.
+-   Enforces plugin lifecycle, configuration validation, state persistence and compatibility checks.
+-   Records structured proposals, explanations, reason codes and evidence references.
+-   Separates scalping and intraday profiles while allowing community-defined strategy types.
+-   Uses the same plugin contract for live evaluation, historical replay and paper simulation.
+-   Does not allow plugins to submit orders, access exchange credentials or bypass centralized risk controls.
+
+### 5.6 Strategy Plugin SDK
+
+The SDK defines the stable extension contract: manifest, plugin API version, configuration schema, event subscriptions, strategy context, decision proposal schema, state snapshot/restore and conformance tests. The exact callable hooks are finalized in a dedicated SDK RFC before the API is declared stable.
+
+Third-party plugins are separate packages/repositories. The core platform does not need to contain every user's strategy.
+
+### 5.7 Risk Manager
 
 ### 5.6 Risk Manager
 
@@ -161,7 +171,7 @@ emit typed events, features and annotations. Initial algorithm sequence:
 -   Is independent from perception and strategy.
 -   Cannot be bypassed by future ML filters.
 
-### 5.7 Execution
+### 5.8 Execution
 
 A paper broker is introduced before any exchange execution. A future
 Delta execution adapter must include local idempotency, client-order-ID
@@ -169,11 +179,12 @@ reconciliation, order/fill/position state machines, protective-order
 verification and emergency shutdown. Live execution requires a separate
 explicit authorization and release gate.
 
-### 5.8 Frontend
+### 5.9 Frontend
 
 Next.js App Router + TypeScript. It renders: - Candles and volume. -
 Configurable timeframes. - Machine-generated annotations. -
-Human-generated drawings. - Decision records. - Trade and risk state. -
+Human-generated drawings. - Strategy plugin discovery/configuration. -
+Decision records. - Trade and risk state. -
 Historical replay and analytics.
 
 The frontend communicates with FastAPI through versioned REST and
@@ -239,7 +250,19 @@ without a measured need and an architecture decision record.
   scikit-learn / XGBoost  Optional classical ML   Deferred
   -----------------------------------------------------------------------
 
-## 8. Non-goals for initial milestones
+## 8. Public extensibility and plugin safety
+
+CandleCore is designed as a public host platform. The Strategy Plugin API is a first-class architectural boundary, not a late add-on. Plugin packages declare identity, semantic version, compatible API range, configuration schema, supported symbols/timeframes, required perception features, entry point and license.
+
+A plugin returns a structured decision proposal. The host independently validates it and routes it through centralized risk controls. Multiple strategies may run concurrently, each with isolated configuration, state, subscriptions and audit history. Portfolio-level risk is shared and authoritative.
+
+The first plugin release supports explicitly trusted, locally installed packages. Python code running in-process is not sandboxed. Do not automatically install or execute arbitrary community packages. A future public registry requires package provenance, dependency/license review, permission declarations, resource limits and process/container isolation.
+
+### Strategy authoring
+
+The first user-facing authoring path is a deterministic structured builder that emits a versioned declarative strategy definition/AST. A constrained interpreter validates and evaluates it. Complex strategies can use Python plugins. Natural-language-to-strategy conversion is a separate future research decision; no LLM is introduced in the current core. If later explored, it may only propose a draft AST for human review and deterministic validation.
+
+## 9. Non-goals for initial milestones
 
 -   Live order execution.
 -   ML-based trading decisions.
@@ -265,3 +288,164 @@ without a measured need and an architecture decision record.
 9.  Frontend chart overlays becoming coupled to the perception engine.
 10. Data corrections or missing intervals contaminating historical
     evaluation.
+
+
+## 10. Public strategy plugin architecture
+
+CandleCore is a host platform with a stable strategy extension API. The core platform owns market data, perception, historical replay, backtesting, risk validation, paper execution and exchange adapters. Strategy authors own the trading logic packaged as independently versioned plugins.
+
+### 10.1 Plugin boundary
+
+A strategy plugin:
+- Consumes standardized, point-in-time market snapshots and typed perception events.
+- Receives a versioned strategy configuration.
+- Maintains only explicitly declared strategy state.
+- Emits structured strategy decisions and explanations.
+- Does not submit, modify or cancel exchange orders.
+- Does not access exchange credentials, database sessions or arbitrary host internals.
+- Cannot bypass the shared risk manager.
+- Must use the same interface in live evaluation, historical replay and paper trading.
+
+### 10.2 Plugin contract
+
+The initial Python SDK should expose a small, versioned Protocol/abstract interface. Conceptual contract:
+
+```python
+class StrategyPlugin(Protocol):
+    manifest: StrategyManifest
+
+    def validate_config(self, config: Mapping[str, object]) -> None: ...
+
+    def initialize(self, context: StrategyContext) -> None: ...
+
+    def on_market_update(
+        self,
+        snapshot: MarketSnapshot,
+        context: StrategyContext,
+    ) -> Sequence[StrategyDecision]: ...
+
+    def on_candle_close(
+        self,
+        snapshot: MarketSnapshot,
+        context: StrategyContext,
+    ) -> Sequence[StrategyDecision]: ...
+
+    def snapshot_state(self) -> Mapping[str, object]: ...
+
+    def restore_state(self, state: Mapping[str, object]) -> None: ...
+
+    def shutdown(self) -> None: ...
+```
+
+The exact hook set must be finalized in the plugin SDK RFC. Plugins should not be forced to implement both update hooks if their declared event subscription does not need them. A plugin must not receive future candles or unconfirmed events unless explicitly subscribed and labelled as provisional.
+
+### 10.3 Manifest and compatibility
+
+Each plugin declares:
+- Unique plugin ID and display name.
+- Plugin version.
+- Author and description.
+- Strategy type/tags, e.g. scalping or intraday.
+- Supported symbols and timeframes.
+- Required perception features/events.
+- Configuration schema and defaults.
+- Minimum and maximum supported CandleCore API versions.
+- Entry point and package metadata.
+- License identifier and source URL.
+- Determinism and state-persistence declarations.
+
+Use semantic versioning for the public plugin API. Breaking API changes require a major version and migration notes. Plugin manifests are validated before activation.
+
+### 10.4 Strategy decision contract
+
+A plugin returns a proposal, not an order. The proposal should include:
+- Decision ID and plugin identity/version.
+- BUY, SELL or NO_TRADE / HOLD action.
+- Instrument and strategy profile.
+- Decision timestamp and input event references.
+- Optional entry, stop and target plan.
+- Explanation and machine-readable reason codes.
+- Expiry/invalidation conditions.
+- Plugin configuration hash.
+
+The platform independently validates the decision, calculates or verifies permitted size, applies portfolio and risk limits, and only then passes an approved intent to the paper/execution adapter.
+
+### 10.5 Lifecycle and isolation
+
+Plugin lifecycle: discovered -> validated -> installed -> configured -> enabled -> running -> disabled/quarantined.
+
+For the first release, only explicitly trusted, locally installed Python plugins may run in-process. Never automatically execute arbitrary code downloaded from a public registry. A future public plugin marketplace requires package provenance, signature/checksum verification, dependency review, permission declarations and process/container isolation. Python in-process plugins are not a security boundary.
+
+Plugins must not perform hidden network calls, filesystem access or background order actions. The host should provide bounded inputs and an explicit context. CPU/time limits and crash isolation are required before supporting third-party untrusted plugins.
+
+### 10.6 Multiple strategies
+
+The platform may run multiple strategies concurrently, but each instance has its own:
+- Plugin ID and version.
+- Instance ID.
+- Configuration and configuration hash.
+- State namespace.
+- Symbol/timeframe subscriptions.
+- Risk allocation/profile.
+- Decision and performance history.
+
+Portfolio-level risk remains centralized. Strategies must not independently assume they own the full account balance or net exposure.
+
+### 10.7 Backtesting and reproducibility
+
+Backtesting invokes the same plugin contract used by live evaluation. Persist:
+- Plugin package/version and API version.
+- Source revision or immutable package hash.
+- Configuration hash.
+- Input dataset identity and revision.
+- Perception algorithm versions.
+- Runtime/environment metadata.
+- Random seed where relevant.
+- Output decisions and fill assumptions.
+
+A backtest result is not reproducible if any of these inputs are unknown.
+
+### 10.8 Plugin conformance suite
+
+The SDK must include tests for:
+- Manifest validation.
+- API compatibility.
+- Configuration validation.
+- Deterministic output for identical inputs.
+- No future-data access.
+- Correct state snapshot/restore.
+- Duplicate event handling.
+- Invalid decision rejection.
+- Exception and timeout behaviour.
+- Replay/live contract parity.
+- Risk-manager separation.
+
+A plugin that fails conformance cannot be marked compatible with a production CandleCore release.
+
+## 11. Strategy authoring and natural-language strategy descriptions
+
+The first strategy-authoring experience will be structured and deterministic, not an AI interpreter.
+
+The planned progression is:
+
+1. **Structured strategy builder:** Users select typed conditions, comparisons, indicators, perception events, timeframes and logical operators.
+2. **Declarative Strategy Definition (DSL):** The builder emits a versioned, typed abstract syntax tree (AST) / JSON document. The DSL is constrained to supported operations and has explicit timestamp semantics.
+3. **Validation and preview:** The system checks missing parameters, incompatible timeframes, unavailable features, look-ahead risks and ambiguous rules. It displays a readable explanation of the compiled rules.
+4. **Human approval:** The author reviews and confirms the exact rule set before it becomes an executable strategy definition.
+5. **Compilation:** The validated definition is interpreted by a deterministic rule engine or compiled into a normal strategy plugin.
+6. **Advanced Python plugins:** Developers can implement custom logic using the public SDK when the DSL is insufficient.
+
+Natural-language-to-strategy conversion is a separate future research item. No LLM or generative-AI dependency is introduced now. If reconsidered, it must be an optional, isolated authoring adapter that proposes a DSL/AST for human review. It must never directly create executable arbitrary Python, enable a strategy, alter risk controls or place orders. Ambiguous English must produce clarification requests, not guessed rules.
+
+## 12. Public ecosystem and contribution policy
+
+CandleCore's core remains independently maintained and the plugin API is versioned. Public contributors may submit:
+- Core improvements through normal review.
+- Strategy plugins in separate packages/repositories.
+- Perception algorithms through reviewed core contributions.
+- Example plugins and conformance tests.
+- Documentation and strategy-definition examples.
+
+A plugin's performance claims must disclose data period, instrument, timeframe, costs, assumptions, out-of-sample methodology and known limitations. CandleCore must not endorse profitability solely because a plugin passes technical conformance.
+
+The repository's software license and the plugin license compatibility policy must be selected explicitly before publishing a formal plugin registry. Public visibility alone does not grant permission to reuse code.
