@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from candlecore.application.gap_recovery import GapRecoveryService
 from candlecore.application.ingestion import IngestionService
@@ -22,12 +23,6 @@ from candlecore.storage.repositories import (
 
 
 class CandleCoreApplication:
-    """Wires exchange clients, repositories, services and the FastAPI app.
-
-    Provides explicit startup/shutdown lifecycle so services are never left
-    partially running.
-    """
-
     def __init__(self) -> None:
         self.settings = get_settings()
         configure_logging()
@@ -46,11 +41,17 @@ class CandleCoreApplication:
         self._started = False
         self.app = self._build_app()
 
-    # --------------------------------------------------------------- app build
     def _build_app(self) -> FastAPI:
         from candlecore.api.routes import health, market
 
         app = FastAPI(title="CandleCore", version="0.1.0")
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["*"],
+        )
         app.include_router(health.router, prefix="/api/v1")
         app.include_router(market.router, prefix="/api/v1")
 
@@ -65,7 +66,6 @@ class CandleCoreApplication:
         app.router.lifespan_context = lifespan
         return app
 
-    # --------------------------------------------------------------- lifecycle
     async def startup(self) -> None:
         if self._started:
             return
@@ -80,13 +80,11 @@ class CandleCoreApplication:
         await dispose_db()
         self._started = False
 
-    # --------------------------------------------------------------- services
     def build_services(
         self,
         session: Any,
         process_candle: Callable[..., Any] | None = None,
     ) -> dict[str, Any]:
-        """Build repositories and services bound to an async session."""
         candle_repo = CandleRepository(session)
         revision_repo = CandleRevisionRepository(session)
         raw_event_repo = RawMarketEventRepository(session)
