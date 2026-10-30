@@ -71,6 +71,37 @@ Save sanitized real response examples as contract fixtures. Never
 include API secrets. If any contract cannot be verified, isolate it
 behind an adapter interface and report the blocker; do not guess.
 
+### Mandatory approval gate — stop after Step 0
+
+**This is a two-stage task. You are authorized to perform Step 0 only on
+your first pass. Do not scaffold the repository, install dependencies,
+create or modify application code, add migrations, or begin Steps 1–9
+until the user explicitly reviews the Step 0 report and approves
+implementation.**
+
+Your first response must contain only the contract-verification report:
+- Official Delta documentation URLs and the exact relevant sections.
+- Verified REST and WebSocket request/response schemas.
+- Sanitized fixtures captured from real exchange responses, with capture
+  time and source noted.
+- Timestamp semantics/units, candle update/finality behaviour,
+  heartbeat, reconnect/resubscribe, REST ordering/boundaries, rate limits
+  and error formats.
+- A table marking every item **verified**, **partially verified** or
+  **unverified**, with evidence.
+- Any conflicts between official documentation, observed payloads and
+  the project documents.
+- Any remaining assumptions, blockers or decisions requiring user input.
+
+Do not fabricate fixtures or label an example from documentation as a
+real captured exchange response. If live capture is unavailable, state
+that clearly and provide the documented example separately.
+
+End the report with a clear statement that implementation has not
+started and wait for explicit user approval. Do not interpret silence,
+the original prompt, or a request to perform Step 0 as approval to
+continue.
+
 ## Step 1 --- Repository scaffold
 
 Create a clean project using a `src/` layout:
