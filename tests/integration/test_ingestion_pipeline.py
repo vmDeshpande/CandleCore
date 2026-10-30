@@ -194,3 +194,42 @@ async def test_revision_preserved_on_change(pg_session):
     assert len(revisions) == 1
     assert revisions[0].revision_number == 0
     assert revisions[0].open == Decimal("100")
+
+
+@pytest.mark.asyncio
+async def test_rest_backfill_serializes_decimal_raw_payload(pg_session):
+    raw_repo = RawMarketEventRepository(pg_session)
+    candle_repo = CandleRepository(pg_session)
+    revision_repo = CandleRevisionRepository(pg_session)
+    checkpoint_repo = IngestionCheckpointRepository(pg_session)
+    engine = CandleLifecycleEngine(candle_repo, revision_repo)
+    service = IngestionService(
+        candle_repository=candle_repo,
+        revision_repository=revision_repo,
+        raw_event_repository=raw_repo,
+        checkpoint_repository=checkpoint_repo,
+        lifecycle_engine=engine,
+    )
+
+    await service.ingest_rest_candle(
+        exchange="delta",
+        symbol="BTCUSD",
+        timeframe="3m",
+        source="exchange_rest",
+        candle={
+            "time": 1700000000,
+            "open": Decimal("100.12345678"),
+            "high": Decimal("110.12345678"),
+            "low": Decimal("90.12345678"),
+            "close": Decimal("105.12345678"),
+            "volume": Decimal("1000.12345678"),
+        },
+        timestamp_unit="seconds",
+    )
+    await pg_session.commit()
+
+    result = await pg_session.execute(select(RawMarketEvent))
+    raw_event = result.scalars().one()
+    assert raw_event.payload["open"] == "100.12345678"
+    assert raw_event.payload["volume"] == "1000.12345678"
+
