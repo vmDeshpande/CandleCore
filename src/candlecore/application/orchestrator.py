@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from candlecore.api.routes import stream
+import candlecore.api.routes.stream as stream
 from candlecore.application.gap_recovery import GapRecoveryService
 from candlecore.application.ingestion import IngestionService
 from candlecore.core.config import get_settings
