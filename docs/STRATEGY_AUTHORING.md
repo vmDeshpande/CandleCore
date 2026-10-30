@@ -26,7 +26,7 @@ The system must not guess:
 ### Stage 1 — Structured strategy builder
 
 Build a UI for selecting:
-- Symbol/timeframe.
+- Strategy-specific symbols and one or more timeframes (entry, exit, filters and higher-timeframe context).
 - Perception event or numerical feature.
 - Comparison operator.
 - Threshold/parameter.
@@ -83,7 +83,9 @@ This is a schema illustration, not a committed DSL. Its operators, event vocabul
 Before execution or backtesting, CandleCore should:
 - Validate schema and types.
 - Check every referenced feature/event exists.
-- Check timeframe availability.
+- Check every requested timeframe and symbol is available or can be derived through a validated aggregation path.
+- Check multi-timeframe alignment and that higher-timeframe candles were finalized by the decision timestamp.
+- Never silently substitute the platform's initial 3m collection interval for a requested strategy timeframe.
 - Check warm-up requirements.
 - Reject impossible or contradictory conditions.
 - Detect use of provisional/future data.
