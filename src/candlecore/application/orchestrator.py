@@ -98,7 +98,7 @@ class CandleCoreApplication:
                         timeframe=timeframe,
                         source="exchange_ws",
                         message=message,
-                        timestamp_unit="microseconds",
+                        timestamp_unit="seconds",
                     )
                     await session.commit()
                     try:
@@ -108,7 +108,7 @@ class CandleCoreApplication:
                             timeframe=timeframe,
                             source="exchange_ws",
                             message=message,
-                            timestamp_unit="microseconds",
+                            timestamp_unit="seconds",
                         )
                         await stream.manager.broadcast(
                             {
