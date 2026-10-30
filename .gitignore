@@ -35,3 +35,5 @@ env/
 .DS_Store
 Thumbs.db
 alembic/versions/*.pyc
+web/node_modules/
+web/.next/

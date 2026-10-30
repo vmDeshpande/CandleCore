@@ -21,7 +21,12 @@ target_metadata = Base.metadata
 settings = get_settings()
 # Alembic runs synchronous migrations. Strip the asyncpg driver so the URL
 # resolves to the default psycopg2 driver used by Alembic's engine_from_config.
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg", ""))
+config.set_main_option(
+    "sqlalchemy.url",
+    settings.database_url.replace(
+    "+asyncpg", "+psycopg2"
+).replace("%", "%%")
+)
 
 
 def run_migrations_offline() -> None:
