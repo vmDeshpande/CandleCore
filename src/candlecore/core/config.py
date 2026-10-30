@@ -1,14 +1,15 @@
-from functools import lru_cache
+﻿from functools import lru_cache
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     # Database
     database_url: str = "postgresql+asyncpg://candlecore:candlecore@localhost:5432/candlecore"
+    candlecore_test_database_url: str | None = None
 
     # Delta Exchange India - public endpoints only, no credentials required for CC-M1
     delta_rest_base_url: str = "https://api.india.delta.exchange"
