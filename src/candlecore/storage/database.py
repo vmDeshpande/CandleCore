@@ -27,3 +27,11 @@ async def init_db() -> None:
 async def dispose_db() -> None:
     """Dispose the SQLAlchemy engine during application shutdown."""
     await engine.dispose()
+
+
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

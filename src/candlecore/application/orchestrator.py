@@ -150,7 +150,7 @@ class CandleCoreApplication:
                         candles = []
                     # fetch recent window properly
                     try:
-                        from datetime import datetime, timedelta
+                        from datetime import datetime
 
                         end_ts = int(datetime.now().timestamp())
                         start_ts = end_ts - 7 * 24 * 3600
@@ -185,7 +185,7 @@ class CandleCoreApplication:
         await init_db()
         self._started = True
         # Attach message handler
-        self.ws_client.on_message = self._handle_ws_message
+        self.ws_client.on_message = self._handle_ws_message  # type: ignore[assignment]
         # Start collector
         if self._collector_task is None or self._collector_task.done():
             self._collector_task = asyncio.create_task(self.ws_client.start())
