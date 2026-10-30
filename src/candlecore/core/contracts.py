@@ -34,7 +34,7 @@ def _validate_ohlcv(
 ) -> None:
     prices = (open_price, high, low, close)
     if not all(price.is_finite() for price in prices):
-        raise ValueError("OHLC prices must be finite decimals")
+        raise ValueError("prices must be finite")
     if low > high:
         raise ValueError("candle low cannot exceed candle high")
     if low > min(open_price, close) or high < max(open_price, close):
