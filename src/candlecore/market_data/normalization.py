@@ -1,9 +1,25 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from candlecore.core.contracts import NormalizedCandleUpdate
 from candlecore.core.decimal_utils import decimal_from_number
 from candlecore.core.timestamp import timestamp_to_datetime
+
+
+def _json_safe(value: Any) -> Any:
+    """Return a JSONB-compatible copy while preserving Decimal precision."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    raise TypeError(f"Unsupported JSON payload type: {type(value).__name__}")
 
 
 def _validate_ohlcv(
@@ -59,7 +75,7 @@ def normalize_rest_candle(
         ),
         original_timestamp=candle_time,
         original_timestamp_unit=timestamp_unit,
-        raw_payload=dict(candle),
+        raw_payload=_json_safe(dict(candle)),
     )
     _validate_ohlcv(
         open_price=update.open,
@@ -106,7 +122,7 @@ def normalize_ws_message(
         volume=volume,
         original_timestamp=int(raw_timestamp) if raw_timestamp is not None else None,
         original_timestamp_unit=timestamp_unit,
-        raw_payload=dict(message),
+        raw_payload=_json_safe(dict(message)),
     )
     _validate_ohlcv(
         open_price=update.open,
