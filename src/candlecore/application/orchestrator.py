@@ -76,13 +76,13 @@ class CandleCoreApplication:
 
         logger = structlog.get_logger()
         try:
-            symbol = message.get("symbol") or message.get("product_symbol")
+            symbol = message.get("symbol") or message.get("product_symbol") or message.get("sy")
             if isinstance(symbol, str):
                 symbol = symbol.upper()
             else:
                 payload = message.get("payload")
                 if isinstance(payload, dict):
-                    symbol = payload.get("symbol") or payload.get("product_symbol")
+                    symbol = payload.get("symbol") or payload.get("product_symbol") or payload.get("sy")
                     if isinstance(symbol, str):
                         symbol = symbol.upper()
             if symbol not in self.settings.symbol_list:
@@ -167,26 +167,44 @@ class CandleCoreApplication:
                         )
                         continue
                     inserted = 0
+                    failed = False
+                    for c in candles:
+                        try:
+                            await ingestion.ingest_rest_candle(
+                                exchange="delta",
+                                symbol=symbol,
+                                timeframe="3m",
+                                source="exchange_rest",
+                                candle=c,
+                                timestamp_unit="seconds",
+                            )
+                            inserted += 1
+                        except Exception as exc:
+                            # A failed flush invalidates the current transaction.
+                            # Roll it back and stop this symbol; never continue
+                            # issuing inserts against a failed SQLAlchemy session.
+                            await session.rollback()
+                            failed = True
+                            logger.error(
+                                "backfill_persist_failed",
+                                symbol=symbol,
+                                candle_time=c.get("time"),
+                                persisted_before_failure=inserted,
+                                error=str(exc),
+                                exc_info=True,
+                            )
+                            break
+
+                    if failed:
+                        logger.error(
+                            "backfill_aborted",
+                            symbol=symbol,
+                            returned_count=len(candles),
+                            persisted_before_failure=inserted,
+                        )
+                        continue
+
                     try:
-                        for c in candles:
-                            try:
-                                await ingestion.ingest_rest_candle(
-                                    exchange="delta",
-                                    symbol=symbol,
-                                    timeframe="3m",
-                                    source="exchange_rest",
-                                    candle=c,
-                                    timestamp_unit="seconds",
-                                )
-                                inserted += 1
-                            except Exception as exc:
-                                logger.error(
-                                    "backfill_persist_failed",
-                                    symbol=symbol,
-                                    error=str(exc),
-                                    exc_info=True,
-                                )
-                                continue
                         await session.commit()
                         logger.info(
                             "backfill_completed",
