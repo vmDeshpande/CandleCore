@@ -16,13 +16,13 @@ stop and report the conflict rather than inventing a resolution.
 
 ## Project identity and hard constraints
 
-CandleCore is a completely new, standalone Python-first project.
+CandleCore is a completely new, standalone, public and extensible Python-first project. Its long-term architecture includes a versioned Strategy Plugin API, but this milestone must not implement that runtime.
 
 -   Do not reuse, copy, fork, import or depend on any other repository.
 -   Do not introduce LLMs, generative AI, VLMs, model APIs or GPU
     inference.
--   Do not implement strategy rules, indicators for trading, order
-    placement or execution in this milestone.
+-   Do not implement strategy rules, the Strategy Plugin SDK/runtime, strategy discovery, plugin loading, indicators for trading, order placement or execution in this milestone.
+-   Preserve clean module boundaries so later strategy plugins can consume standardized market/perception contracts without coupling to Delta or storage internals.
 -   Do not add unnecessary microservices, Redis, Kafka, Kubernetes or
     TimescaleDB.
 -   Do not hardcode exchange product precision or invent API payload
@@ -237,3 +237,12 @@ locally.
 
 Do not claim completion if an acceptance criterion has not been
 demonstrated. Do not proceed to CC-M2 without review and approval.
+
+
+## Future architecture constraint — pluggable strategies
+
+CandleCore is a public platform, not a single-strategy bot. Later milestones will add a versioned Strategy Plugin API. CC-M1 must not implement plugins, but do not make market-data contracts depend on a single strategy, a single trading style or the friend's methodology. Keep market data and domain events generic, versioned and suitable for independent strategies.
+
+Future plugins will receive standardized point-in-time snapshots and emit structured decision proposals only. They will not access exchange credentials or submit orders. Centralized risk and execution remain platform-owned.
+
+Natural-language-to-strategy conversion is not part of CC-M1 or the current core. The planned first authoring path is a deterministic structured builder/DSL; any future AI assistance requires a separate decision and can only produce a human-reviewed draft definition.
