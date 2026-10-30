@@ -3,20 +3,14 @@ import os
 from collections.abc import AsyncGenerator
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 TEST_DB_URL = os.environ.get("CANDLECORE_TEST_DATABASE_URL")
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def pg_engine():
     if not TEST_DB_URL:
         pytest.fail(
@@ -32,7 +26,7 @@ async def pg_engine():
     await engine.dispose()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def pg_session(pg_engine) -> AsyncGenerator[AsyncSession, None]:
     session_factory = async_sessionmaker(pg_engine, class_=AsyncSession, expire_on_commit=False)
     async with session_factory() as session:
