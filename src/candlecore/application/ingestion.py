@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from candlecore.core.timestamp import timestamp_to_datetime
@@ -15,6 +16,25 @@ from candlecore.storage.repositories import (
     IngestionCheckpointRepository,
     RawMarketEventRepository,
 )
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert exchange payload values into JSONB-compatible primitives.
+
+    Keep Decimal precision by storing decimal values as strings rather than
+    converting them to binary floats.
+    """
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(f"Unsupported JSON payload type: {type(value).__name__}")
 
 
 class IngestionService:
@@ -73,7 +93,7 @@ class IngestionService:
             original_timestamp_unit=timestamp_unit,
             sequence=None,
             schema_version=1,
-            payload=dict(candle),
+            payload=_json_safe(dict(candle)),
         )
 
         # 2. Normalize.
@@ -139,7 +159,7 @@ class IngestionService:
             original_timestamp_unit=timestamp_unit,
             sequence=None,
             schema_version=1,
-            payload=dict(message),
+            payload=_json_safe(dict(message)),
         )
 
         # 2. Normalize.
