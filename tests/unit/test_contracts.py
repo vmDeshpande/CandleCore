@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -49,9 +49,7 @@ def test_candle_observation_rejects_invalid_ohlcv(
 
 
 def test_candle_observation_normalizes_aware_timestamps_to_utc() -> None:
-    timestamp = datetime(2026, 10, 30, 12, 0, tzinfo=UTC).astimezone(
-        __import__("datetime").timezone(timedelta(hours=5, minutes=30))
-    )
+    timestamp = datetime(2026, 10, 30, 12, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
     candle = make_candle(candle_open_time=timestamp)
     assert candle.candle_open_time.tzinfo == UTC
 
