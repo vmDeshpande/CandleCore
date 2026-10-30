@@ -25,7 +25,7 @@ assumptions are explicitly listed. - CC-M1 scope is fixed.
 
 Deliverables: - Python package and development tooling. - Delta REST
 historical downloader. - Delta public WebSocket candle collector. -
-BTCUSD, ETHUSD and SOLUSD 3m subscriptions as the first collection slice. Keep the data model and interfaces timeframe-generic; 3m is not a platform default. - Payload normalization and
+BTCUSD, ETHUSD and SOLUSD 3m subscriptions. - Payload normalization and
 timestamp conversion. - Candle validation and lifecycle. - PostgreSQL
 schema and Alembic migrations. - Raw event persistence. - Gap detection
 and REST recovery. - Read-only FastAPI historical endpoint. - Contract,
@@ -39,7 +39,7 @@ pass. - No trading signals or order submission.
 Deliverables: - Next.js App Router + TypeScript application. -
 Lightweight Charts v5 integration. - Historical candle loading. - Live
 candle updates. - Volume panel. - Symbol selector for BTCUSD, ETHUSD and
-SOLUSD. - strategy-aware chart timeframe selection, with multiple intervals available according to configured data coverage. - Backend stream
+SOLUSD. - 3m chart and extensible timeframe selector. - Backend stream
 contract. - TradingView attribution.
 
 Exit: - Chart data matches persisted backend data. -
@@ -148,7 +148,9 @@ flowchart TD
 
 ## First development milestone: CC-M1
 
-**Goal:** A restart-safe, auditable Delta market-data recorder. The first CC-M1 slice collects 3m candles for BTCUSD, ETHUSD and SOLUSD, with historical backfill, live collection, gap recovery, PostgreSQL persistence and a read-only API. The long-term platform must support data requirements derived from each enabled strategy's declared symbols and timeframes; 3m is not a global primary timeframe.
+**Goal:** A restart-safe, auditable Delta three-minute market-data
+recorder for BTCUSD, ETHUSD and SOLUSD, with historical backfill, live
+collection, gap recovery, PostgreSQL persistence and a read-only API.
 
 **Explicit exclusions:** trading rules, signals, ML, paper orders and
 live orders.
